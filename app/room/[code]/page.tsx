@@ -28,7 +28,6 @@ export default function LobbyPage({
     }
   }, [code])
 
-  // Poll room state every 3 seconds as reliable fallback
   useEffect(() => {
     if (!player) {
       router.push('/')
@@ -68,7 +67,8 @@ export default function LobbyPage({
 
   if (!player) return null
 
-  const canStart = player.isHost && players.length >= 6
+  const MIN_PLAYERS = 4
+  const canStart = player.isHost && players.length >= MIN_PLAYERS
 
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
@@ -108,8 +108,8 @@ export default function LobbyPage({
               disabled={!canStart}
               className="w-full rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {players.length < 6
-                ? `Need ${6 - players.length} more players`
+              {players.length < MIN_PLAYERS
+                ? `Need ${MIN_PLAYERS - players.length} more players`
                 : 'Start Game'}
             </button>
           </div>

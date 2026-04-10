@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import { usePlayer } from '@/app/lib/player-context'
 import { useGameEngine } from '@/app/lib/game-engine'
 import { getAblyClient } from '@/app/lib/ably'
-import DrawingCanvas from './components/drawing-canvas'
 import StrokeReplay from './components/stroke-replay'
+import DrawingCanvas from './components/drawing-canvas'
 import VotingPhase from './components/voting-phase'
 import ResultsPhase from './components/results-phase'
 import FinalResults from './components/final-results'
-import type { Player, GameEndEvent } from '@/app/lib/types'
+import type { Player, GameEndEvent, Drawing } from '@/app/lib/types'
 
 export default function PlayPage({
   params,
@@ -24,7 +24,6 @@ export default function PlayPage({
   const [gameEnded, setGameEnded] = useState(false)
   const [endEvent, setEndEvent] = useState<GameEndEvent | null>(null)
 
-  // Fetch room players
   useEffect(() => {
     if (!player) {
       router.push('/')
@@ -61,7 +60,6 @@ export default function PlayPage({
     playerIds,
   })
 
-  // Listen for game_end
   useEffect(() => {
     if (!player) return
     const ably = getAblyClient(player.id)
@@ -77,15 +75,15 @@ export default function PlayPage({
     }
   }, [code, player])
 
-  // Start game when page loads (host)
+  // Host auto-starts game
   useEffect(() => {
-    if (player?.isHost && playerIds.length >= 6 && gameState.round === 0) {
+    if (player?.isHost && playerIds.length >= 4 && gameState.round === 0) {
       startGame()
     }
   }, [player?.isHost, playerIds.length, gameState.round, startGame])
 
   const handleDrawingComplete = useCallback(
-    (drawing: import('@/app/lib/types').Drawing) => {
+    (drawing: Drawing) => {
       const myTeam = gameState.teams.find(
         (t) => t.player1Id === player?.id || t.player2Id === player?.id
       )
@@ -125,9 +123,12 @@ export default function PlayPage({
     )
   }
 
-  const myTeam = gameState.teams.find(
-    (t) => t.player1Id === player.id || t.player2Id === player.id
-  )
+  const isHost = player.isHost
+  const myTeam = isHost
+    ? null
+    : gameState.teams.find(
+        (t) => t.player1Id === player.id || t.player2Id === player.id
+      )
   const myAxis = myTeam?.player1Id === player.id ? 'x' : 'y'
 
   return (
@@ -137,37 +138,26 @@ export default function PlayPage({
         <div className="mb-6 text-center">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             Round {gameState.round}/5
+            {isHost && ' — Spectating'}
           </p>
           <h2 className="mt-1 text-xl font-bold text-zinc-900 dark:text-zinc-50">
             {gameState.prompt}
           </h2>
         </div>
 
-        {/* Drawing phase */}
-        {gameState.phase === 'drawing' && myTeam && (
-          <DrawingCanvas
-            roomCode={code}
-            teamId={myTeam.id}
-            playerId={player.id}
-            axis={myAxis as 'x' | 'y'}
-            timeLeft={drawingTimeLeft}
-            onDrawingComplete={handleDrawingComplete}
-          />
-        )}
-
-        {gameState.phase === 'drawing' && !myTeam && (
-          <div className="text-center">
+        {/* HOST SPECTATOR VIEW */}
+        {isHost && gameState.phase === 'drawing' && (
+          <div className="space-y-4 text-center">
             <p className="text-zinc-500 dark:text-zinc-400">
-              Sitting this round out (odd player count)
+              {gameState.teams.length} teams are drawing...
             </p>
-            <p className="mt-2 font-mono text-lg text-zinc-900 dark:text-zinc-50">
+            <p className="font-mono text-3xl font-bold text-zinc-900 dark:text-zinc-50">
               {drawingTimeLeft}s
             </p>
           </div>
         )}
 
-        {/* Viewing phase */}
-        {gameState.phase === 'viewing' && (
+        {isHost && gameState.phase === 'viewing' && (
           <div className="space-y-4">
             <h2 className="text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
               Team {viewingTeamIndex + 1} of {gameState.teams.length}
@@ -183,21 +173,84 @@ export default function PlayPage({
                 />
               </div>
             )}
-            {player.isHost && (
-              <button
-                onClick={nextViewing}
-                className="w-full rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                {viewingTeamIndex + 1 >= gameState.teams.length
-                  ? 'Start Voting'
-                  : 'Next Drawing'}
-              </button>
-            )}
+            <button
+              onClick={nextViewing}
+              className="w-full rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              {viewingTeamIndex + 1 >= gameState.teams.length
+                ? 'Start Voting'
+                : 'Next Drawing'}
+            </button>
           </div>
         )}
 
-        {/* Voting phase */}
-        {gameState.phase === 'voting' && (
+        {isHost && gameState.phase === 'voting' && (
+          <div className="space-y-4 text-center">
+            <p className="text-zinc-500 dark:text-zinc-400">Players are voting...</p>
+            <p className="font-mono text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              {votingTimeLeft}s
+            </p>
+          </div>
+        )}
+
+        {isHost && gameState.phase === 'results' && gameState.round > 0 && (
+          <ResultsPhase
+            round={gameState.round}
+            teams={gameState.teams}
+            cumulativeScores={gameState.cumulativeScores}
+            roundScores={gameState.roundScores}
+            playerNames={playerNames}
+            isHost={true}
+            onNextRound={nextRound}
+          />
+        )}
+
+        {/* PLAYER VIEW */}
+        {!isHost && gameState.phase === 'drawing' && myTeam && (
+          <DrawingCanvas
+            roomCode={code}
+            teamId={myTeam.id}
+            playerId={player.id}
+            axis={myAxis as 'x' | 'y'}
+            timeLeft={drawingTimeLeft}
+            onDrawingComplete={handleDrawingComplete}
+          />
+        )}
+
+        {!isHost && gameState.phase === 'drawing' && !myTeam && (
+          <div className="text-center">
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Sitting this round out (odd player count)
+            </p>
+            <p className="mt-2 font-mono text-lg text-zinc-900 dark:text-zinc-50">
+              {drawingTimeLeft}s
+            </p>
+          </div>
+        )}
+
+        {!isHost && gameState.phase === 'viewing' && (
+          <div className="space-y-4">
+            <h2 className="text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+              Team {viewingTeamIndex + 1} of {gameState.teams.length}
+            </h2>
+            {gameState.teams[viewingTeamIndex] && (
+              <div className="flex justify-center">
+                <StrokeReplay
+                  drawing={
+                    gameState.drawings[gameState.teams[viewingTeamIndex].id] || []
+                  }
+                  size={350}
+                  animate={true}
+                />
+              </div>
+            )}
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              Waiting for host...
+            </p>
+          </div>
+        )}
+
+        {!isHost && gameState.phase === 'voting' && (
           <VotingPhase
             teams={gameState.teams}
             drawings={gameState.drawings}
@@ -207,15 +260,14 @@ export default function PlayPage({
           />
         )}
 
-        {/* Results phase */}
-        {gameState.phase === 'results' && gameState.round > 0 && (
+        {!isHost && gameState.phase === 'results' && gameState.round > 0 && (
           <ResultsPhase
             round={gameState.round}
             teams={gameState.teams}
             cumulativeScores={gameState.cumulativeScores}
             roundScores={gameState.roundScores}
             playerNames={playerNames}
-            isHost={player.isHost}
+            isHost={false}
             onNextRound={nextRound}
           />
         )}

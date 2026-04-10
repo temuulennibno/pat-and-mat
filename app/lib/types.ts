@@ -9,6 +9,7 @@ export type RoomStatus = 'waiting' | 'playing' | 'finished'
 export type Room = {
   code: string
   hostId: string
+  hostName: string
   players: Player[]
   status: RoomStatus
   createdAt: number

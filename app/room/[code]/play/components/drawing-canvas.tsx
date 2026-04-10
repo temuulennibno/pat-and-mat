@@ -155,6 +155,7 @@ export default function DrawingCanvas({
   }, [timeLeft, axis, onDrawingComplete])
 
   function handlePointerMove(e: React.PointerEvent) {
+    e.preventDefault()
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
@@ -179,7 +180,10 @@ export default function DrawingCanvas({
     }
   }
 
-  function handlePointerDown() {
+  function handlePointerDown(e: React.PointerEvent) {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    if (canvas) canvas.setPointerCapture(e.pointerId)
     myPenDownRef.current = true
     teamChannel.publish('pen_down', { playerId })
   }

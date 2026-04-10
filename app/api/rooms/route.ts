@@ -23,7 +23,8 @@ export async function POST(request: Request) {
   const room: Room = {
     code,
     hostId: playerId,
-    players: [{ id: playerId, name: playerName, joinedAt: Date.now() }],
+    hostName: playerName,
+    players: [],
     status: 'waiting',
     createdAt: Date.now(),
   }
