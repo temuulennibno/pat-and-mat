@@ -95,18 +95,18 @@ export default function Home() {
             />
 
             <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="w-full rounded-xl bg-zinc-900 px-4 py-4 text-lg font-bold text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              onClick={() => setMode('join')}
+              className="w-full rounded-xl bg-zinc-900 px-4 py-4 text-lg font-bold text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              Create Room
+              Join Room
             </button>
 
             <button
-              onClick={() => setMode('join')}
-              className="w-full rounded-xl border-2 border-zinc-300 px-4 py-4 text-lg font-bold text-zinc-900 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
+              onClick={handleCreate}
+              disabled={loading}
+              className="w-full rounded-xl border-2 border-zinc-300 px-4 py-4 text-lg font-bold text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
             >
-              Join Room
+              Create Room
             </button>
           </div>
         )}
