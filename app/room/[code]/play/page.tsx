@@ -75,10 +75,11 @@ export default function PlayPage({
     }
   }, [code, player])
 
-  // Host auto-starts game
+  // Host auto-starts game after 3s delay so all players can connect
   useEffect(() => {
     if (player?.isHost && playerIds.length >= 4 && gameState.round === 0) {
-      startGame()
+      const timeout = setTimeout(() => startGame(), 3000)
+      return () => clearTimeout(timeout)
     }
   }, [player?.isHost, playerIds.length, gameState.round, startGame])
 

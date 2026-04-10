@@ -44,6 +44,14 @@ export function useGameEngine({ roomCode, playerId, isHost, playerIds }: UseGame
   const timerRef = useRef<ReturnType<typeof setInterval>>(null)
   const votesRef = useRef<Vote[]>([])
   const drawingsRef = useRef<Record<string, Drawing>>({})
+  const gameStateRef = useRef<GameState>(INITIAL_STATE)
+  const drawingTimeRef = useRef(0)
+  const votingTimeRef = useRef(0)
+
+  // Keep refs in sync with state
+  useEffect(() => { gameStateRef.current = gameState }, [gameState])
+  useEffect(() => { drawingTimeRef.current = drawingTimeLeft }, [drawingTimeLeft])
+  useEffect(() => { votingTimeRef.current = votingTimeLeft }, [votingTimeLeft])
 
   const ably = getAblyClient(playerId)
   const channel = ably.channels.get(`room:${roomCode}`)
@@ -129,7 +137,6 @@ export function useGameEngine({ roomCode, playerId, isHost, playerIds }: UseGame
     )
     const winnerTeamId = sorted[0]?.[0] || ''
 
-    // Calculate MVP: player whose teams got most good votes
     const playerGoodVotes: Record<string, number> = {}
     for (const vote of votesRef.current) {
       if (vote.vote !== 'good') continue
@@ -228,10 +235,65 @@ export function useGameEngine({ roomCode, playerId, isHost, playerIds }: UseGame
       setVotingTimeLeft(0)
     })
 
+    // Host: respond to sync requests from late-joining players
+    if (isHost) {
+      channel.subscribe('sync_request', () => {
+        const gs = gameStateRef.current
+        if (gs.round > 0) {
+          channel.publish('sync_state', {
+            round: gs.round,
+            phase: gs.phase,
+            teams: gs.teams,
+            prompt: gs.prompt,
+            cumulativeScores: gs.cumulativeScores,
+            roundScores: gs.roundScores,
+            drawings: gs.drawings,
+            drawingTimeLeft: drawingTimeRef.current,
+            votingTimeLeft: votingTimeRef.current,
+          })
+        }
+      })
+    }
+
+    // Non-host: listen for sync responses
+    if (!isHost) {
+      channel.subscribe('sync_state', (msg) => {
+        const data = msg.data
+        setGameState((prev) => {
+          // Only apply sync if we haven't started yet
+          if (prev.round > 0) return prev
+          return {
+            ...prev,
+            round: data.round,
+            phase: data.phase,
+            teams: data.teams,
+            prompt: data.prompt,
+            cumulativeScores: data.cumulativeScores,
+            roundScores: data.roundScores,
+            drawings: data.drawings || {},
+            votes: [],
+          }
+        })
+        if (data.drawingTimeLeft > 0) setDrawingTimeLeft(data.drawingTimeLeft)
+        if (data.votingTimeLeft > 0) setVotingTimeLeft(data.votingTimeLeft)
+      })
+    }
+
     return () => {
       channel.unsubscribe()
     }
-  }, [channel])
+  }, [channel, isHost])
+
+  // Non-host: request sync after connecting (with small delay)
+  useEffect(() => {
+    if (isHost) return
+    const timeout = setTimeout(() => {
+      if (gameStateRef.current.round === 0) {
+        channel.publish('sync_request', { playerId })
+      }
+    }, 1500)
+    return () => clearTimeout(timeout)
+  }, [isHost, channel, playerId])
 
   // Drawing timer
   useEffect(() => {
