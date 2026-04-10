@@ -33,12 +33,16 @@ export async function POST(
   room.players.push(newPlayer)
   await kv.set(`room:${code}`, room, { ex: 7200 })
 
-  // Broadcast to lobby via Ably
+  // Broadcast to lobby via Ably (non-blocking — join succeeds even if broadcast fails)
   const apiKey = process.env.ABLY_API_KEY
   if (apiKey) {
-    const ably = new Ably.Rest(apiKey)
-    const channel = ably.channels.get(`room:${code}`)
-    await channel.publish('player_joined', newPlayer)
+    try {
+      const ably = new Ably.Rest(apiKey)
+      const channel = ably.channels.get(`room:${code}`)
+      await channel.publish('player_joined', newPlayer)
+    } catch {
+      // Ably broadcast failure shouldn't block join
+    }
   }
 
   return Response.json({ playerId, room })
