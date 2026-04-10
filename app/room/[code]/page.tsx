@@ -28,6 +28,7 @@ export default function LobbyPage({
     }
   }, [code])
 
+  // Poll room state every 3 seconds as reliable fallback
   useEffect(() => {
     if (!player) {
       router.push('/')
@@ -35,6 +36,7 @@ export default function LobbyPage({
     }
 
     fetchRoom()
+    const interval = setInterval(fetchRoom, 3000)
 
     const ably = getAblyClient(player.id)
     const channel = ably.channels.get(`room:${code}`)
@@ -52,6 +54,7 @@ export default function LobbyPage({
     })
 
     return () => {
+      clearInterval(interval)
       channel.unsubscribe()
     }
   }, [player, code, router, fetchRoom])
