@@ -1,30 +1,18 @@
-type Entry = {
-  value: string
-  expiresAt: number
-}
+import { Redis } from '@upstash/redis'
 
-const store = new Map<string, Entry>()
+const redis = Redis.fromEnv()
 
 export const kv = {
   async get<T>(key: string): Promise<T | null> {
-    const entry = store.get(key)
-    if (!entry) return null
-    if (Date.now() > entry.expiresAt) {
-      store.delete(key)
-      return null
-    }
-    return JSON.parse(entry.value) as T
+    return redis.get<T>(key)
   },
 
   async set(key: string, value: unknown, options?: { ex?: number }): Promise<void> {
     const ttl = options?.ex ?? 7200
-    store.set(key, {
-      value: JSON.stringify(value),
-      expiresAt: Date.now() + ttl * 1000,
-    })
+    await redis.set(key, value, { ex: ttl })
   },
 
   async del(key: string): Promise<void> {
-    store.delete(key)
+    await redis.del(key)
   },
 }
