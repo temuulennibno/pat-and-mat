@@ -1,65 +1,134 @@
-import Image from "next/image";
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { usePlayer } from './lib/player-context'
 
 export default function Home() {
+  const router = useRouter()
+  const { setPlayer } = usePlayer()
+  const [name, setName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleCreate() {
+    if (!name.trim()) return setError('Enter your name')
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: name.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setPlayer({
+        id: data.playerId,
+        name: name.trim(),
+        roomCode: data.code,
+        isHost: true,
+      })
+      router.push(`/room/${data.code}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create room')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleJoin() {
+    if (!name.trim()) return setError('Enter your name')
+    if (!joinCode.trim()) return setError('Enter a room code')
+    setLoading(true)
+    setError('')
+
+    try {
+      const code = joinCode.trim().toUpperCase()
+      const res = await fetch(`/api/rooms/${code}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: name.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setPlayer({
+        id: data.playerId,
+        name: name.trim(),
+        roomCode: code,
+        isHost: false,
+      })
+      router.push(`/room/${code}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to join room')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="w-full max-w-sm space-y-8 px-6">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Pat & Mat
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-2 text-zinc-500 dark:text-zinc-400">
+            Axis Split Drawing Game
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={20}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-50"
+          />
+
+          <button
+            onClick={handleCreate}
+            disabled={loading}
+            className="w-full rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            Create Room
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            <span className="text-sm text-zinc-400">or join</span>
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Room code"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={4}
+              className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-center font-mono text-lg tracking-widest text-zinc-900 uppercase placeholder-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-50"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <button
+              onClick={handleJoin}
+              disabled={loading}
+              className="rounded-lg border border-zinc-300 px-6 py-3 font-medium text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
+            >
+              Join
+            </button>
+          </div>
         </div>
-      </main>
+
+        {error && (
+          <p className="text-center text-sm text-red-500">{error}</p>
+        )}
+      </div>
     </div>
-  );
+  )
 }
